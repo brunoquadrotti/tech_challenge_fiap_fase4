@@ -5,6 +5,7 @@ import streamlit as st
 
 from audio.processor import AudioProcessor
 from audio.emotion_analyzer import EmotionAnalyzer
+from rag.query import search_documents
 
 # Configuração da página
 st.set_page_config(
@@ -147,3 +148,27 @@ video_file = st.file_uploader(
 if video_file is not None:
     st.success(f"Vídeo carregado com sucesso: **{video_file.name}**")
     st.video(video_file)
+
+st.markdown("---")
+
+# Busca semântica RAG
+st.subheader("📚 Busca Semântica em Protocolos Médicos")
+st.write("Consulte a base de conhecimento com protocolos e documentos médicos.")
+
+query = st.text_input(
+    "Digite sua pergunta:",
+    placeholder="Ex: Quais são os sintomas de depressão pós-parto?",
+    key="rag_query",
+)
+
+if query:
+    with st.spinner("Buscando nos documentos..."):
+        results = search_documents(query)
+
+    if results:
+        st.write(f"**{len(results)} trecho(s) encontrado(s):**")
+        for i, result in enumerate(results, 1):
+            with st.expander(f"Resultado {i} — Similaridade: {result['score']:.2%}"):
+                st.write(result["content"])
+    else:
+        st.info("Nenhum resultado encontrado. Verifique se os documentos foram ingeridos.")
