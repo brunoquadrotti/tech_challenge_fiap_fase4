@@ -1,0 +1,15 @@
+streamlit
+openai-whisper
+torch
+transformers
+langchain
+langchain-community
+chromadb
+openai
+python-dotenv
+deepface
+opencv-python
+azure-storage-blob
+sentence-transformers
+pypdf
+tiktoken
