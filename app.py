@@ -5,6 +5,7 @@ import streamlit as st
 
 from audio.processor import AudioProcessor
 from audio.emotion_analyzer import EmotionAnalyzer
+from video.processor import VideoProcessor
 from rag.query import search_documents
 
 # Configuração da página
@@ -25,6 +26,12 @@ def load_audio_processor():
 def load_emotion_analyzer():
     """Carrega o EmotionAnalyzer uma única vez (cache do Streamlit)."""
     return EmotionAnalyzer()
+
+
+@st.cache_resource
+def load_video_processor():
+    """Carrega o VideoProcessor uma única vez (cache do Streamlit)."""
+    return VideoProcessor()
 
 
 # Sidebar com descrição do projeto
@@ -148,6 +155,45 @@ video_file = st.file_uploader(
 if video_file is not None:
     st.success(f"Vídeo carregado com sucesso: **{video_file.name}**")
     st.video(video_file)
+
+    # Análise emocional do vídeo
+    with st.spinner("Analisando emoções no vídeo com DeepFace..."):
+        # Salvar arquivo temporário
+        tmp_video_path = None
+        try:
+            suffix = os.path.splitext(video_file.name)[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(video_file.getbuffer())
+                tmp_video_path = tmp.name
+
+            # Analisar
+            vp = load_video_processor()
+            video_result = vp.analyze_video(tmp_video_path)
+
+        finally:
+            # Remover vídeo temporário
+            if tmp_video_path and os.path.exists(tmp_video_path):
+                os.remove(tmp_video_path)
+
+    # Exibir resultados
+    if video_result:
+        st.subheader("🎭 Análise Emocional de Vídeo")
+
+        # Exibir frame analisado
+        if video_result.get("frame_path") and os.path.exists(video_result["frame_path"]):
+            st.image(
+                video_result["frame_path"],
+                caption="Frame analisado",
+                use_container_width=True,
+            )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Emoção Dominante", video_result["dominant_emotion"].capitalize())
+        with col2:
+            st.metric("Confiança", f"{video_result['confidence']:.1%}")
+    else:
+        st.warning("Não foi possível analisar o vídeo.")
 
 st.markdown("---")
 
