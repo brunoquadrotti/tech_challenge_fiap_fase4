@@ -6,6 +6,7 @@ import streamlit as st
 from audio.processor import AudioProcessor
 from audio.emotion_analyzer import EmotionAnalyzer
 from video.processor import VideoProcessor
+from cloud.azure_blob import AzureBlobService
 from rag.query import search_documents
 
 # Configuração da página
@@ -32,6 +33,16 @@ def load_emotion_analyzer():
 def load_video_processor():
     """Carrega o VideoProcessor uma única vez (cache do Streamlit)."""
     return VideoProcessor()
+
+
+@st.cache_resource
+def load_blob_service():
+    """Carrega o AzureBlobService uma única vez (cache do Streamlit)."""
+    try:
+        return AzureBlobService()
+    except ValueError as e:
+        print(f"[App] Azure Blob não configurado: {e}")
+        return None
 
 
 # Sidebar com descrição do projeto
@@ -81,6 +92,14 @@ if audio_file is not None:
             # Transcrever
             processor = load_audio_processor()
             transcription = processor.transcribe(tmp_path)
+
+            # Upload para Azure Blob
+            blob_service = load_blob_service()
+            if blob_service:
+                blob_url = blob_service.upload_file(tmp_path, f"audio/{audio_file.name}")
+                if blob_url:
+                    st.success("☁️ Arquivo enviado para armazenamento cloud com sucesso.")
+                    st.caption(f"URL: `{blob_url}`")
 
         finally:
             # Remover arquivo temporário
@@ -169,6 +188,16 @@ if video_file is not None:
             # Analisar
             vp = load_video_processor()
             video_result = vp.analyze_video(tmp_video_path)
+
+            # Upload para Azure Blob
+            blob_service = load_blob_service()
+            if blob_service:
+                blob_url = blob_service.upload_file(
+                    tmp_video_path, f"video/{video_file.name}"
+                )
+                if blob_url:
+                    st.success("☁️ Arquivo enviado para armazenamento cloud com sucesso.")
+                    st.caption(f"URL: `{blob_url}`")
 
         finally:
             # Remover vídeo temporário
