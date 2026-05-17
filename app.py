@@ -8,6 +8,7 @@ from audio.emotion_analyzer import EmotionAnalyzer
 from video.processor import VideoProcessor
 from cloud.azure_blob import AzureBlobService
 from rag.query import search_documents
+from reports.generator import ReportGenerator
 
 # Configuração da página
 st.set_page_config(
@@ -45,6 +46,16 @@ def load_blob_service():
         return None
 
 
+@st.cache_resource
+def load_report_generator():
+    """Carrega o ReportGenerator uma única vez (cache do Streamlit)."""
+    try:
+        return ReportGenerator()
+    except ValueError as e:
+        print(f"[App] ReportGenerator não configurado: {e}")
+        return None
+
+
 # Sidebar com descrição do projeto
 with st.sidebar:
     st.header("Sobre o Projeto")
@@ -66,6 +77,14 @@ with st.sidebar:
 # Título principal
 st.title("🩺 IA Multimodal — Saúde da Mulher")
 st.markdown("---")
+
+# Inicializar session state para armazenar resultados
+if "audio_emotions" not in st.session_state:
+    st.session_state.audio_emotions = None
+if "video_result" not in st.session_state:
+    st.session_state.video_result = None
+if "rag_results" not in st.session_state:
+    st.session_state.rag_results = None
 
 # Upload de áudio
 st.subheader("🎙️ Upload de Áudio")
@@ -115,6 +134,9 @@ if audio_file is not None:
         with st.spinner("Analisando emoções no texto..."):
             analyzer = load_emotion_analyzer()
             emotions = analyzer.analyze(transcription)
+
+        # Salvar no session state
+        st.session_state.audio_emotions = emotions
 
         st.subheader("🧠 Análise Emocional")
 
@@ -206,6 +228,7 @@ if video_file is not None:
 
     # Exibir resultados
     if video_result:
+        st.session_state.video_result = video_result
         st.subheader("🎭 Análise Emocional de Vídeo")
 
         # Exibir frame analisado
@@ -241,9 +264,43 @@ if query:
         results = search_documents(query)
 
     if results:
+        st.session_state.rag_results = results
         st.write(f"**{len(results)} trecho(s) encontrado(s):**")
         for i, result in enumerate(results, 1):
             with st.expander(f"Resultado {i} — Similaridade: {result['score']:.2%}"):
                 st.write(result["content"])
     else:
         st.info("Nenhum resultado encontrado. Verifique se os documentos foram ingeridos.")
+
+st.markdown("---")
+
+# Relatório Clínico Multimodal
+st.subheader("📋 Relatório Clínico Multimodal")
+st.write("Gere um relatório consolidado com base nas análises realizadas.")
+
+# Verificar se há dados disponíveis
+has_audio = st.session_state.audio_emotions is not None
+has_video = st.session_state.video_result is not None
+has_rag = st.session_state.rag_results is not None
+
+if has_audio or has_video:
+    if st.button("Gerar Relatório", key="generate_report"):
+        with st.spinner("Gerando relatório clínico com IA..."):
+            generator = load_report_generator()
+
+            if generator:
+                report = generator.generate_report(
+                    audio_analysis=st.session_state.audio_emotions or {},
+                    video_analysis=st.session_state.video_result or {},
+                    rag_results=st.session_state.rag_results or [],
+                )
+
+                if report:
+                    st.markdown("---")
+                    st.markdown(report)
+                else:
+                    st.error("Não foi possível gerar o relatório.")
+            else:
+                st.error("ReportGenerator não configurado. Verifique a OPENAI_API_KEY no .env.")
+else:
+    st.info("Envie um áudio ou vídeo para habilitar a geração do relatório.")
